@@ -1,0 +1,23 @@
+// This file is not a part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/02/ZeroCheck.hdl
+
+
+// Checks if a bus is zero
+// Output is 1 if bus == 0 and 0 otherwise
+
+CHIP NegativeCheck16 {
+    IN  
+        x[16];
+
+    OUT 
+        ng;
+
+    PARTS:
+    Or(a=x[15], b=x[15], out=ng);
+
+
+
+    
+}
