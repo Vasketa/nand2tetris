@@ -1,0 +1,61 @@
+// This file is not a part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/05/JumpFunction.hdl
+
+/**
+ * The Hack CPU (Central Processing unit), consisting of an ALU,
+ * This file contains a function that, given the 3 jump bits from
+ * the instruction and the 2 control bits from the ALU, computes
+ * if a jump is to be made or not. This file was mainly made to hide
+ * the hideous code.
+ */
+
+CHIP JumpFunction {
+
+    IN  j2, j1, j0,      // jump bits from the C instruction
+        zr, ng;          // control bits from ALU
+
+    OUT jmp;
+
+    PARTS:
+    Not(in=j2, out=notJ2);
+    Not(in=j0, out=notJ0);
+    Not(in=zr, out=notZr);
+    Not(in=ng, out=notNg);
+
+    // j2*!zr*ng
+    And(a=j2, b=notZr, out=temp1);
+    And(a=temp1, b=ng, out=prod1);
+
+    // j2*j1*j0
+    And(a=j2, b=j1, out=temp2);
+    And(a=temp2, b=j0, out=prod2);
+
+    // !j2*j1*zr*!ng
+    And(a=notJ2, b=j1, out=temp3);
+    And(a=temp3, b=zr, out=temp4);
+    And(a=temp4, b=notNg, out=prod3);
+
+    // j1*!j0*zr*!ng
+    And(a=j1, b=notJ0, out=temp5);
+    And(a=temp5, b=zr, out=temp6);
+    And(a=temp6, b=notNg, out=prod4);
+
+    // j0*!zr*!ng
+    And(a=j0, b=notZr, out=temp7);
+    And(a=temp7, b=notNg, out=prod5);
+
+    // j2*j0*!zr
+    And(a=j2, b=j0, out=temp8);
+    And(a=temp8, b=notZr, out=prod6);
+
+    Or(a=prod1, b=prod2, out=out1);
+    Or(a=out1, b=prod3, out=out2);
+    Or(a=out2, b=prod4, out=out3);
+    Or(a=out3, b=prod5, out=out4);
+    Or(a=out4, b=prod6, out=jmp);
+    
+    
+
+}

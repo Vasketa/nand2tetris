@@ -1,7 +1,7 @@
 // This file is part of www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
-// File name: projects/05/CPU.hdl
+// File name: projects/05/CPUWithBuiltInRegisters.hdl
 
 /**
  * The Hack CPU (Central Processing unit), consisting of an ALU,
@@ -43,13 +43,13 @@ CHIP CPU {
 
     Not(in=instruction[15], out=isAInstr);
     Or(a=isAInstr, b=instruction[5], out=loadA);
-    Register(in=inAReg, load=loadA, out=outAReg, out[0..14]=addressM);  // A Register
+    ARegister(in=inAReg, load=loadA, out=outAReg, out[0..14]=addressM);  // A Register
 
     And(a=instruction[12], b=instruction[15], out=selectMOrA);
     Mux16(a=outAReg, b=inM, sel=selectMOrA, out=inALU2);
 
     And(a=instruction[15], b=instruction[4], out=loadD);
-    Register(in=tempOut, load=loadD, out=inALU1); // D Register
+    DRegister(in=tempOut, load=loadD, out=inALU1); // D Register
 
     ALU(x=inALU1, y=inALU2, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=tempOut, out=outM, zr=zr, ng=ng);
 
