@@ -15,21 +15,10 @@ CHIP ZeroCheck16 {
         zr;
 
     PARTS:
-    Or(a=x[0], b=x[1], out=tempOr1);
-    Or(a=tempOr1, b=x[2], out=tempOr2);
-    Or(a=tempOr2, b=x[3], out=tempOr3);
-    Or(a=tempOr3, b=x[4], out=tempOr4);
-    Or(a=tempOr4, b=x[5], out=tempOr5);
-    Or(a=tempOr5, b=x[6], out=tempOr6);
-    Or(a=tempOr6, b=x[7], out=tempOr7);
-    Or(a=tempOr7, b=x[8], out=tempOr8);
-    Or(a=tempOr8, b=x[9], out=tempOr9);
-    Or(a=tempOr9, b=x[10], out=tempOr10);
-    Or(a=tempOr10, b=x[11], out=tempOr11);
-    Or(a=tempOr11, b=x[12], out=tempOr12);
-    Or(a=tempOr12, b=x[13], out=tempOr13);
-    Or(a=tempOr13, b=x[14], out=tempOr14);
-    Or(a=tempOr14, b=x[15], out=notZr);
+    Or8Way(in=x[0..7], out=tempOr1);
+    Or8Way(in=x[8..15], out=tempOr2);
+
+    Or(a=tempOr1, b=tempOr2, out=notZr);
     Not(in=notZr, out=zr);
 
 
