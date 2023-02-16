@@ -19,8 +19,8 @@ class Commands(Enum):
     LABEL_COMMAND = "label"
     GOTO_COMMAND = "goto"
     IF_GOTO_COMMAND = "if-goto"
-    FUNCTION_COMMAND = "Function"
-    CALL_COMMAND = "Call"
+    FUNCTION_COMMAND = "function"
+    CALL_COMMAND = "call"
     RETURN_COMMAND = "return"
 
 class MemorySegments(Enum):

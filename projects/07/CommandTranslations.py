@@ -10,17 +10,22 @@ from VMTranslatorUtils import join_commands
 count_equal = -1
 count_greater_than = -1
 count_lesser_than = -1
+current_function = ""
 
 def get_asm_code_from_command(tokens: List[str], file_name: str) -> str:
     vm_command = tokens[0]
+    file_stem = Path(file_name).stem
     global count_equal
     global count_greater_than
     global count_lesser_than
+    global count_call
+    global count_return
+    global current_function
     
     if vm_command == Commands.PUSH_COMMAND.value:
-        return get_push_command_asm(tokens, file_name)
+        return get_push_command_asm(tokens, file_stem)
     elif vm_command == Commands.POP_COMMAND.value:
-        return get_pop_command_asm(tokens, file_name)
+        return get_pop_command_asm(tokens, file_stem)
     elif vm_command == Commands.ADD_COMMAND.value:
         return get_add_asm()
     elif vm_command == Commands.SUBTRACT_COMMAND.value:
@@ -42,12 +47,28 @@ def get_asm_code_from_command(tokens: List[str], file_name: str) -> str:
         return get_or_asm()
     elif vm_command == Commands.LOGICAL_NOT_COMMAND.value:
         return get_not_asm()
+    elif vm_command == Commands.LABEL_COMMAND.value:
+        return get_label_asm(tokens)
+    elif vm_command == Commands.GOTO_COMMAND.value:
+        depth = count_call - count_return
+        return get_goto_asm(tokens, file_stem, depth)
+    elif vm_command == Commands.IF_GOTO_COMMAND.value:
+        depth = count_call - count_return
+        return get_ifgoto_asm(tokens, file_stem, depth)
+    elif vm_command == Commands.FUNCTION_COMMAND.value:
+        return get_function_asm(tokens, file_stem)
+    elif vm_command == Commands.CALL_COMMAND.value:
+        count_call += 1
+        return get_call_asm(tokens, file_stem)
+    elif vm_command == Commands.RETURN_COMMAND.value:
+        count_return += 1
+        return get_return_asm(tokens)
+    
 
-def get_push_command_asm(tokens: List[str], file_name: str) -> str:
+def get_push_command_asm(tokens: List[str], file_stem: str) -> str:
     """Get the assembly code for a push command."""
     segment = tokens[1]
     index = tokens[2]
-    file_stem = Path(file_name).stem
 
     if segment == MemorySegments.CONSTANT.value:
         return get_push_constant_asm(index)
@@ -68,7 +89,8 @@ def get_push_command_asm(tokens: List[str], file_name: str) -> str:
     else:
         print(f"[PUSH COMMAND EXCEPTION, SEGMENT = {segment}]")
         exit(2)
-    
+
+
 def get_push_constant_asm(index: str) -> str:
     """Get the assembly code for the push constant command."""
     asm_commands = [
@@ -189,11 +211,10 @@ def get_push_temp_asm(index: str) -> str:
         ]
     return join_commands(asm_commands)    
 
-def get_pop_command_asm(tokens: List[str], file_name: str) -> str:
+def get_pop_command_asm(tokens: List[str], file_stem: str) -> str:
     """Get the assembly code for a pop command."""
     segment = tokens[1]
     index = tokens[2]
-    file_stem = Path(file_name).stem
 
     if segment == MemorySegments.STATIC.value:
         return get_pop_static_asm(index, file_stem)
@@ -211,7 +232,7 @@ def get_pop_command_asm(tokens: List[str], file_name: str) -> str:
         return get_pop_temp_asm(index)
     else:
         print(f"[POP COMMAND EXCEPTION, SEGMENT = {segment}]")
-        exit(2)
+        exit(3)
     
 def get_pop_static_asm(index: str, file_stem: str) -> str:
     asm_commands = [
@@ -518,5 +539,138 @@ def get_not_asm() -> str:
     ]
     return join_commands(asm_commands)
 
+def get_label_asm(tokens: List[str]) -> str:
+    """Get the assembly code for the label command."""
+    label_name = tokens[1]
+    return f"({label_name})\n"
 
 
+def get_goto_asm(tokens: List[str], file_stem: str, depth: int) -> str:
+    """Get the assembly code for the goto command."""
+    label_name = tokens[1]
+    asm_commands = []
+    asm_commands = [
+        f"@{file_stem}.{current_function}${label_name}",
+        "0;JMP", # Unconditional jump to a label
+    ]
+    return join_commands(asm_commands)
+
+def get_ifgoto_asm(tokens: List[str], file_stem: str, depth: int) -> str:
+    """Get the assembly code for the if-goto command."""
+    label_name = tokens[1]
+    asm_commands = []
+    asm_commands = [
+        "@SP",
+        "AM=M-1", # Update and select stack pointer
+        "D=M", # Store condition in D
+        f"@{current_function}${label_name}",
+        "D;JNE", # Jump to label if condition != false
+    ]
+    return join_commands(asm_commands)
+
+def get_function_asm(tokens: List[str], file_stem: str) -> str:
+    """Get the assembly code for the function command."""
+    global current_function
+    function_name = tokens[1]
+    local_length = tokens[2]
+    current_function = function_name
+    asm_commands = [
+        f"({current_function})", #Set entry label
+        f"@{local_length}",
+        "D=A", # Save the length of LCL segment in D
+        "@SP",
+        "M=M+D", # Update stack pointer
+    ]
+    return join_commands(asm_commands)
+
+def get_call_asm(tokens: List[str], file_stem: str) -> str:
+    """Get the assembly code for the call command."""
+    function_name = tokens[1]
+    argument_length = tokens[2]
+    asm_commands = [
+        "@LCL",
+        "D=M", # Save LCL address in D
+        "@SP",
+        "A=M",
+        "M=D", # Save LCL address in the stack
+        "@SP",
+        "M=M+1", # Update stack pointer
+        "@ARG",
+        "D=M", # Save ARG address in D
+        "@SP",
+        "A=M",
+        "M=D", # Save ARG address in the stack
+        "@SP",
+        "M=M+1", # Update stack pointer
+        "@THIS",
+        "D=M", # Save THIS address in D
+        "@SP",
+        "A=M",
+        "M=D", # Save THIS address in the stack
+        "@SP",
+        "M=M+1", # Update stack pointer
+        "@THAT",
+        "D=M", # Save THAT address in D
+        "@SP",
+        "A=M",
+        "M=D", # Save THAT address in the stack
+        "@SP",
+        "MD=M+1", # Update stack pointer and save it in D
+        "@5",
+        "D=D-A", # D = (SP address) - 5
+        f"@{argument_length}",
+        "D=D-A", # D = (SP address) - 5 - len(arguments)
+        "@ARG",
+        "M=D", # Set new ARG address
+        "@SP",
+        "D=M", # Save stack address in D
+        "@LCL",
+        "M=D", # Set new local segment (LCL = SP)
+        f"@{function_name}",
+        "0;JMP",
+        f"(RET_ADDRESS_CALL_{function_name})", # Set return address
+    ]
+    return join_commands(asm_commands)
+
+def get_return_asm(tokens: List[str]) -> str:
+    asm_commands = [
+        "@SP",
+        "A=M-1",
+        "D=M", # Store return value in D 
+        "@ARG",
+        "A=M",
+        "M=D", # Replace ARG[0] with the return value
+        "@ARG",
+        "D=M",
+        "@SP", 
+        "M=D+1", # Set SP address = ARG address + 1
+        "@LCL",
+        "A=M-1",
+        "D=M", # Save caller's (THAT address) in D
+        "@THAT",
+        "M=D", # Save caller's (THAT address) in THAT
+        "@2",
+        "D=A",
+        "@LCL",
+        "A=M-D",
+        "D=M", # Save caller's (THIS address) in D
+        "@THIS",
+        "M=D", # Save caller's (THIS address) in THIS
+        "@3",
+        "D=A",
+        "@LCL",
+        "A=M-D",
+        "D=M", # Save caller's (ARG address) in D
+        "@ARG",
+        "M=D", # Save caller's (ARG address) in ARG
+        "@4",
+        "D=A",
+        "@LCL",
+        "A=M-D",
+        "D=M", # Save caller's (LCL address) in D
+        "@LCL",
+        "M=D", # Save caller's (LCL address) in LCL
+        f"@RET_ADDRESS_CALL_{current_function}", 
+        "0;JMP", # goto function return address
+    ]
+    return join_commands(asm_commands)

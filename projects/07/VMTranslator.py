@@ -15,7 +15,7 @@ if __name__ == "__main__":
         file_lines = read_file(f)
 
     assembly_code = []
-    assembly_code.append(get_start_code_asm())
+    # assembly_code.append(get_start_code_asm())
     for line in file_lines:
         tokens = line.split(" ")
 
