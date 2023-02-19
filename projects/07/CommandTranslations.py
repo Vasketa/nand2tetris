@@ -1,6 +1,6 @@
 """This module generates the assembly code given a VM command"""
-from typing import List
-from typing_extensions import Literal
+from typing import List, Tuple
+from typing import Literal
 from pathlib import Path
 
 from VMTranslatorConstants import (TEMP_BASE_ADDRESS, GENERAL_PURPOSE_REGISTER
@@ -12,16 +12,20 @@ count_greater_than = -1
 count_lesser_than = -1
 current_function = ""
 
-def get_asm_code_from_command(tokens: List[str], file_name: str) -> str:
+def get_asm_code_from_command(tokens: List[str], file_range_to_file_name: List[Tuple[int, str]], current_line: int) -> str:
     vm_command = tokens[0]
-    file_stem = Path(file_name).stem
+
+    file_stem = ""
+    for file_start_index, file_name in reversed(file_range_to_file_name):
+        if current_line >= file_start_index:
+            file_stem = file_name
+            break
+
     global count_equal
     global count_greater_than
     global count_lesser_than
-    global count_call
-    global count_return
     global current_function
-    
+
     if vm_command == Commands.PUSH_COMMAND.value:
         return get_push_command_asm(tokens, file_stem)
     elif vm_command == Commands.POP_COMMAND.value:
@@ -50,20 +54,16 @@ def get_asm_code_from_command(tokens: List[str], file_name: str) -> str:
     elif vm_command == Commands.LABEL_COMMAND.value:
         return get_label_asm(tokens)
     elif vm_command == Commands.GOTO_COMMAND.value:
-        depth = count_call - count_return
-        return get_goto_asm(tokens, file_stem, depth)
+        return get_goto_asm(tokens, file_stem)
     elif vm_command == Commands.IF_GOTO_COMMAND.value:
-        depth = count_call - count_return
-        return get_ifgoto_asm(tokens, file_stem, depth)
+        return get_ifgoto_asm(tokens, file_stem)
     elif vm_command == Commands.FUNCTION_COMMAND.value:
         return get_function_asm(tokens, file_stem)
     elif vm_command == Commands.CALL_COMMAND.value:
-        count_call += 1
         return get_call_asm(tokens, file_stem)
     elif vm_command == Commands.RETURN_COMMAND.value:
-        count_return += 1
         return get_return_asm(tokens)
-    
+
 
 def get_push_command_asm(tokens: List[str], file_stem: str) -> str:
     """Get the assembly code for a push command."""
@@ -545,20 +545,19 @@ def get_label_asm(tokens: List[str]) -> str:
     return f"({label_name})\n"
 
 
-def get_goto_asm(tokens: List[str], file_stem: str, depth: int) -> str:
+def get_goto_asm(tokens: List[str], file_stem: str) -> str:
     """Get the assembly code for the goto command."""
     label_name = tokens[1]
     asm_commands = []
     asm_commands = [
-        f"@{file_stem}.{current_function}${label_name}",
+        f"@{current_function}${label_name}",
         "0;JMP", # Unconditional jump to a label
     ]
     return join_commands(asm_commands)
 
-def get_ifgoto_asm(tokens: List[str], file_stem: str, depth: int) -> str:
+def get_ifgoto_asm(tokens: List[str], file_stem: str) -> str:
     """Get the assembly code for the if-goto command."""
     label_name = tokens[1]
-    asm_commands = []
     asm_commands = [
         "@SP",
         "AM=M-1", # Update and select stack pointer

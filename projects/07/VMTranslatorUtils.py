@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 from typing import List, TextIO
-
+import re
 from VMTranslatorConstants import STACK_START
 
 def read_file(f: TextIO) -> List[str]:
@@ -12,32 +12,41 @@ def read_file(f: TextIO) -> List[str]:
     """
     file_lines = []
     for line in f.readlines():
-        line = line.strip()
         if line.startswith("//") or not line:
             continue
         else:
-            file_lines.append(line)
+            match = re.match("(.+)\/\/|.+", line)
+            parsed_string = line
+            if match:
+                if match.group(1):
+                    parsed_string = match.group(1)
+                else:
+                    parsed_string = match.group(0)
+            else:
+                continue
+            file_lines.append(parsed_string.strip())
     return file_lines
 
-def parse_file_name_from_argument() -> str:
-    """Parse the file name from the command line arguments."""
+def parse_folder_name_from_argument() -> str:
+    """Parse the folder name from the command line arguments."""
     parser = argparse.ArgumentParser(
-        prog="VM File",
-        description="VM File to translate",
+        prog="VM folder",
+        description="VM folder to translate",
     )
 
-    parser.add_argument("vm_file")
+    parser.add_argument("vm_folder")
     args = parser.parse_args()
 
-    file_name = args.vm_file
-    return file_name
+    folder_name = args.vm_folder
+    return folder_name
 
-def write_to_output(file_name: str, assembly_code: str) -> None:
+def write_to_output(folder_name: str, assembly_code: str) -> None:
     """Write the assembly code to a file.
 
     The file is written with the same name as the input file but ending suffix of .asm.
     """
-    assembly_file = Path(file_name).with_suffix(".asm")
+    output_file = Path(folder_name) / "out"
+    assembly_file = output_file.with_suffix(".asm")
     print(f"Output file: {assembly_file}")
     with open(assembly_file, "w") as f:
         f.write(assembly_code)
@@ -52,3 +61,10 @@ def get_start_code_asm() -> str:
     RAM[0] = 256
     """
     return join_commands([f"@{STACK_START}", "D=A", "@SP", "M=D"])
+
+def get_jump_to_main_asm() -> str:
+    asm_commands = [
+        "@Sys.init",
+        "0;JMP"
+    ]
+    return join_commands(asm_commands)
