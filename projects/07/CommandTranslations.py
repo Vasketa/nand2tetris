@@ -1,15 +1,16 @@
 """This module generates the assembly code given a VM command"""
-from typing import List, Tuple
-from typing import Literal
+from typing import List, Tuple, Literal
+#from typing_extensions import Literal
 from pathlib import Path
 
-from VMTranslatorConstants import (TEMP_BASE_ADDRESS, GENERAL_PURPOSE_REGISTER
-                                   ,Commands, MemorySegments)
+from VMTranslatorConstants import (TEMP_BASE_ADDRESS, GENERAL_PURPOSE_REGISTER, HANDLE_RETURN_REGISTER,
+                                   Commands, MemorySegments)
 from VMTranslatorUtils import join_commands
 
 count_equal = -1
 count_greater_than = -1
 count_lesser_than = -1
+count_call = -1
 current_function = ""
 
 def get_asm_code_from_command(tokens: List[str], file_range_to_file_name: List[Tuple[int, str]], current_line: int) -> str:
@@ -25,6 +26,7 @@ def get_asm_code_from_command(tokens: List[str], file_range_to_file_name: List[T
     global count_greater_than
     global count_lesser_than
     global current_function
+    global count_call
 
     if vm_command == Commands.PUSH_COMMAND.value:
         return get_push_command_asm(tokens, file_stem)
@@ -60,9 +62,11 @@ def get_asm_code_from_command(tokens: List[str], file_range_to_file_name: List[T
     elif vm_command == Commands.FUNCTION_COMMAND.value:
         return get_function_asm(tokens, file_stem)
     elif vm_command == Commands.CALL_COMMAND.value:
+        count_call += 1
         return get_call_asm(tokens, file_stem)
     elif vm_command == Commands.RETURN_COMMAND.value:
         return get_return_asm(tokens)
+
 
 
 def get_push_command_asm(tokens: List[str], file_stem: str) -> str:
@@ -89,7 +93,6 @@ def get_push_command_asm(tokens: List[str], file_stem: str) -> str:
     else:
         print(f"[PUSH COMMAND EXCEPTION, SEGMENT = {segment}]")
         exit(2)
-
 
 def get_push_constant_asm(index: str) -> str:
     """Get the assembly code for the push constant command."""
@@ -262,12 +265,12 @@ def get_pop_this_asm(index: str) -> str:
         "D=A",
         "@THIS",
         "D=D+M", # Store the address of this(i) in D 
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "M=D", # Store the address of this(i) in GEN_P_REG
         "@SP",
         "AM=M-1", # Update and select stack pointer
         "D=M", # Store the stack_top in D
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "A=M", # Select this(i)
         "M=D", # Store the value in this(i)
     ]
@@ -280,12 +283,12 @@ def get_pop_that_asm(index: str) -> str:
         "D=A",
         "@THAT",
         "D=D+M", # Store the address of that(i) in D 
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "M=D", # Store the address of that(i) in GEN_P_REG
         "@SP",
         "AM=M-1", # Update and select stack pointer
         "D=M", # Store the stack_top in D
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "A=M", # Select that(i)
         "M=D", # Store the value in that(i)
     ]
@@ -298,12 +301,12 @@ def get_pop_local_asm(index: str) -> str:
         "D=A",
         "@LCL",
         "D=D+M", # Store the address of local(i) in D 
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "M=D", # Store the address of local(i) in GEN_P_REG
         "@SP",
         "AM=M-1", # Update and select stack pointer
         "D=M", # Store the stack_top in D
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "A=M", # Select local(i)
         "M=D", # Store the value in local(i)
     ]
@@ -315,13 +318,13 @@ def get_pop_argument_asm(index: str) -> str:
         f"@{index}",
         "D=A",
         "@ARG",
-        "D=D+M", # Store the address of argument(i) in D 
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        "D=D+M", # Store the address of argument(i) in D
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "M=D", # Store the address of argument(i) in GEN_P_REG
         "@SP",
         "AM=M-1", # Update and select stack pointer
         "D=M", # Store the stack_top in D
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "A=M", # Select argument(i)
         "M=D", # Store the value in argument(i)
     ]
@@ -334,12 +337,12 @@ def get_pop_temp_asm(index: str) -> str:
         "D=A",
         f"@{TEMP_BASE_ADDRESS}",
         "D=D+A", # Store the address of temp(i) in D 
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "M=D", # Store the address of temp(i) in GEN_P_REG
         "@SP",
         "AM=M-1", # Update and select stack pointer
         "D=M", # Store the stack_top in D
-        f"@{GENERAL_PURPOSE_REGISTER}",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
         "A=M", # Select temp(i)
         "M=D", # Store the value in temp(i)
     ]
@@ -542,8 +545,7 @@ def get_not_asm() -> str:
 def get_label_asm(tokens: List[str]) -> str:
     """Get the assembly code for the label command."""
     label_name = tokens[1]
-    return f"({label_name})\n"
-
+    return f"({current_function}${label_name})\n"
 
 def get_goto_asm(tokens: List[str], file_stem: str) -> str:
     """Get the assembly code for the goto command."""
@@ -574,7 +576,30 @@ def get_function_asm(tokens: List[str], file_stem: str) -> str:
     local_length = tokens[2]
     current_function = function_name
     asm_commands = [
-        f"({current_function})", #Set entry label
+        f"({current_function})", # Set entry label
+        f"@R{GENERAL_PURPOSE_REGISTER}",
+        "M=0", # Clear GEN_P_REG
+        f"@{local_length}",
+        "D=A", # Save local_length in D
+        f"@{current_function}_CLEARED_LCL",
+        "D;JEQ", # Jump to cleared_LCL if local_length == 0
+        f"({current_function}_CLEAR_LCL)",
+        "D=0", 
+        "@SP",
+        "A=M",
+        "M=D", # Push 0 to stack
+        "@SP",
+        "M=M+1", # Update stack pointer
+        "@1", # Loop counter
+        "D=A",
+        f"@R{GENERAL_PURPOSE_REGISTER}",
+        "M=M+D", # Increment *GEN_P_REG
+        "D=M",
+        f"@{local_length}",
+        "D=D-A",
+        f"@{current_function}_CLEAR_LCL",
+        "D;JNE", # Back to loop while *GEN_P_REG - local_length != 0
+        f"({current_function}_CLEARED_LCL)",
         f"@{local_length}",
         "D=A", # Save the length of LCL segment in D
         "@SP",
@@ -587,6 +612,13 @@ def get_call_asm(tokens: List[str], file_stem: str) -> str:
     function_name = tokens[1]
     argument_length = tokens[2]
     asm_commands = [
+        f"@RET_ADDRESS_CALL_{function_name}_{count_call}",
+        "D=A",
+        "@SP", # Save return address address in D
+        "A=M",
+        "M=D", # Save return adress in the stack
+        "@SP",
+        "M=M+1", # Update stack pointer
         "@LCL",
         "D=M", # Save LCL address in D
         "@SP",
@@ -627,12 +659,19 @@ def get_call_asm(tokens: List[str], file_stem: str) -> str:
         "M=D", # Set new local segment (LCL = SP)
         f"@{function_name}",
         "0;JMP",
-        f"(RET_ADDRESS_CALL_{function_name})", # Set return address
+        f"(RET_ADDRESS_CALL_{function_name}_{count_call})", # Set return address
     ]
     return join_commands(asm_commands)
 
 def get_return_asm(tokens: List[str]) -> str:
     asm_commands = [
+        "@5",
+        "D=A",
+        "@LCL",
+        "A=M-D", # Return address = *(LCL - 5)
+        "D=M", # Save return address in D
+        f"@R{HANDLE_RETURN_REGISTER}",
+        "M=D", # *HANDLE_RETURN_REGISTER = return address
         "@SP",
         "A=M-1",
         "D=M", # Store return value in D 
@@ -640,7 +679,7 @@ def get_return_asm(tokens: List[str]) -> str:
         "A=M",
         "M=D", # Replace ARG[0] with the return value
         "@ARG",
-        "D=M",
+        "D=M", # Store ARG address in D
         "@SP", 
         "M=D+1", # Set SP address = ARG address + 1
         "@LCL",
@@ -669,7 +708,8 @@ def get_return_asm(tokens: List[str]) -> str:
         "D=M", # Save caller's (LCL address) in D
         "@LCL",
         "M=D", # Save caller's (LCL address) in LCL
-        f"@RET_ADDRESS_CALL_{current_function}", 
+        f"@R{HANDLE_RETURN_REGISTER}",
+        "A=M", 
         "0;JMP", # goto function return address
     ]
     return join_commands(asm_commands)

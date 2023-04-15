@@ -10,7 +10,7 @@ from VMTranslatorUtils import (
     parse_folder_name_from_argument,
     write_to_output,
     get_start_code_asm,
-    get_jump_to_main_asm
+    get_call_and_jump_to_init_asm
 )
 
 from CommandTranslations import get_asm_code_from_command
@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
     assembly_code = []
     assembly_code.append(get_start_code_asm())
-    assembly_code.append(get_jump_to_main_asm())
+    assembly_code.append(get_call_and_jump_to_init_asm())
     for current_line, line in enumerate(code_from_files):
         tokens = line.split(" ")
         assembly_code.append(get_asm_code_from_command(tokens, file_range_to_file_name, current_line))
